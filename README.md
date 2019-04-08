@@ -1,4 +1,4 @@
-# CamposPotenciales
+# campos_potenciales
 Implementación en RVIZ con Kobuki de campos potenciales.
 
 Requiere kobuki_softnode y rviz.
