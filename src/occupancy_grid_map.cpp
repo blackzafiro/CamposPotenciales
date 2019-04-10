@@ -16,48 +16,34 @@ const int WIDTH = 24;       /// A lo largo del eje rojo x
 const int HEIGHT = 31;      /// A lo largo del eje verde
 const float RESOLUTION = 0.3f; /// [m/cell]
 
-/** Sets the cells between [i1,j1] and [i2,j2] inclusive as occupied with probability value. */
-void fillRectangle(char* data, int i1, int j1, int i2, int j2, int value)
-{
-  for(int i = i1; i <= i2; i++)
-  {
-    for(int j = j1; j <= j2; j++)
-    {
-      data[i*WIDTH+j] = value;
-    }
-  }
-}
-
-/** Receives the message of the navigation goal from rviz. */
-void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
-{
-  ROS_INFO("\nFrame: %s\nMove to: [%f, %f, %f] - [%f, %f, %f, %f]",
-           poseStamped.header.frame_id.c_str(),
-           poseStamped.pose.position.x,
-           poseStamped.pose.position.y,
-           poseStamped.pose.position.z,
-           poseStamped.pose.orientation.x,
-           poseStamped.pose.orientation.y,
-           poseStamped.pose.orientation.z,
-           poseStamped.pose.orientation.w);
-}
-
-
-// %Tag(INIT)%
-int main( int argc, char** argv )
-{
-  ros::init(argc, argv, "basic_map");
-  ros::NodeHandle n;
-  ros::Rate r(1);
-  //ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-  ros::Publisher marker_pub = n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
-  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, receiveNavGoal); // Máximo 5 mensajes en la cola.
-// %EndTag(INIT)%
-
-// %Tag(MAP_INIT)%
+class Mapa {
+private:
+  ros::Publisher marker_pub;
   nav_msgs::OccupancyGrid map;
 
-  // http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
+  ros::NodeHandle& r_n;
+
+public:
+
+  /** Constructor. */
+  Mapa(ros::NodeHandle& r_n) : r_n(r_n)
+  {
+    marker_pub = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
+    llenaMapa();
+  }
+
+  void publicate()
+  {
+    marker_pub.publish(map);
+  }
+
+private:
+  /** Agrega los obstáculos al mapa */
+  void llenaMapa()
+  {
+    // %Tag(MAP_INIT)%
+  
+    // http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
     map.header.frame_id = "/odom";
     map.header.stamp = ros::Time::now();   // No caduca
 
@@ -88,11 +74,55 @@ int main( int argc, char** argv )
     //data[5*WIDTH+2] = -1;
     map.data = std::vector<int8_t>(data, data + size);
   
-// %EndTag(MAP_INIT)%
+    // %EndTag(MAP_INIT)%
+  }
+
+
+  /** Sets the cells between [i1,j1] and [i2,j2] inclusive as occupied with probability value. */
+  void fillRectangle(char* data, int i1, int j1, int i2, int j2, int value)
+  {
+    for(int i = i1; i <= i2; i++)
+    {
+      for(int j = j1; j <= j2; j++)
+      {
+        data[i*WIDTH+j] = value;
+      }
+    }
+  }
+};
+
+
+
+/** Receives the message of the navigation goal from rviz. */
+void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
+{
+  ROS_INFO("\nFrame: %s\nMove to: [%f, %f, %f] - [%f, %f, %f, %f]",
+           poseStamped.header.frame_id.c_str(),
+           poseStamped.pose.position.x,
+           poseStamped.pose.position.y,
+           poseStamped.pose.position.z,
+           poseStamped.pose.orientation.x,
+           poseStamped.pose.orientation.y,
+           poseStamped.pose.orientation.z,
+           poseStamped.pose.orientation.w);
+}
+
+
+// %Tag(INIT)%
+int main( int argc, char** argv )
+{
+  ros::init(argc, argv, "basic_map");
+  ros::NodeHandle n;
+  ros::Rate r(1);
+  //ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+  Mapa mapa(n);
+  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, receiveNavGoal); // Máximo 5 mensajes en la cola.
+// %EndTag(INIT)%
+
 
   while (ros::ok())
   {
-    marker_pub.publish(map);
+    mapa.publicate();
 
 // %Tag(SLEEP_END)%
     ros::spinOnce();
