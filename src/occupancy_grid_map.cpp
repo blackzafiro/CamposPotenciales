@@ -14,7 +14,7 @@
 
 const int WIDTH = 24;       /// A lo largo del eje rojo x
 const int HEIGHT = 31;      /// A lo largo del eje verde
-const int RESOLUTION = 0.3; /// [m/cell]
+const float RESOLUTION = 0.3f; /// [m/cell]
 
 /** Sets the cells between [i1,j1] and [i2,j2] inclusive as occupied with probability value. */
 void fillRectangle(char* data, int i1, int j1, int i2, int j2, int value)
@@ -64,8 +64,8 @@ int main( int argc, char** argv )
     map.info.resolution = RESOLUTION;      // [m/cell]
     map.info.width = WIDTH;                // [cells]
     map.info.height = HEIGHT;              // [cells]
-    map.info.origin.position.x = 0;//RESOLUTION * WIDTH / 2.0;
-    map.info.origin.position.y = 0;//RESOLUTION * HEIGHT / 2.0;
+    map.info.origin.position.x = -RESOLUTION * WIDTH / 2.0;
+    map.info.origin.position.y = -RESOLUTION * HEIGHT / 2.0;
     map.info.origin.position.z = 0;
     map.info.origin.orientation.x = 0.0;
     map.info.origin.orientation.y = 0.0;
