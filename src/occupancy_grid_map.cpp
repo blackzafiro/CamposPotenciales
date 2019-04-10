@@ -12,8 +12,9 @@
 /// El eje Y es verde.
 /// El eje Z apunta hacia arriba y el marcador es azul.
 
-const int WIDTH = 24;      /// A lo largo del eje rojo x
-const int HEIGHT = 31;     /// A lo largo del eje verde
+const int WIDTH = 24;       /// A lo largo del eje rojo x
+const int HEIGHT = 31;      /// A lo largo del eje verde
+const int RESOLUTION = 0.3; /// [m/cell]
 
 /** Sets the cells between [i1,j1] and [i2,j2] inclusive as occupied with probability value. */
 void fillRectangle(char* data, int i1, int j1, int i2, int j2, int value)
@@ -49,7 +50,7 @@ int main( int argc, char** argv )
   ros::NodeHandle n;
   ros::Rate r(1);
   //ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-  ros::Publisher marker_pub = n.advertise<nav_msgs::OccupancyGrid>("visualization_marker", 1);
+  ros::Publisher marker_pub = n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
   ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, receiveNavGoal); // Máximo 5 mensajes en la cola.
 // %EndTag(INIT)%
 
@@ -60,11 +61,11 @@ int main( int argc, char** argv )
     map.header.frame_id = "/odom";
     map.header.stamp = ros::Time::now();   // No caduca
 
-    map.info.resolution = 0.3;             // [m/cell]
+    map.info.resolution = RESOLUTION;      // [m/cell]
     map.info.width = WIDTH;                // [cells]
     map.info.height = HEIGHT;              // [cells]
-    map.info.origin.position.x = 0;
-    map.info.origin.position.y = 0;
+    map.info.origin.position.x = 0;//RESOLUTION * WIDTH / 2.0;
+    map.info.origin.position.y = 0;//RESOLUTION * HEIGHT / 2.0;
     map.info.origin.position.z = 0;
     map.info.origin.orientation.x = 0.0;
     map.info.origin.orientation.y = 0.0;
