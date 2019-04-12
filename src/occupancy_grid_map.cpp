@@ -6,6 +6,8 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <vector>
+#include <math.h>
+//#include <cmath.h>
 // %EndTag(INCLUDES)%
 
 
@@ -41,7 +43,10 @@ public:
   /** Recibe la velocidad en coordenadas del robot y publica para rviz. */
   void publicaVelocidad(const geometry_msgs::Twist& robotVel)
   {
-    velocity_mark.scale.x = robotVel.linear.x;
+    double magnitud = sqrt(pow(robotVel.linear.x, 2) + pow(robotVel.angular.z, 2));
+    velocity_mark.scale.x = magnitud;
+    velocity_mark.pose.orientation.x = robotVel.linear.x; // TODO: Pasar de Euler a cuaterniones.
+    velocity_mark.pose.orientation.z = robotVel.angular.z;
     marker_pub.publish(velocity_mark);
   }
 
