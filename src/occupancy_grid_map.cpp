@@ -7,7 +7,8 @@
 #include <geometry_msgs/Twist.h>
 #include <vector>
 #include <math.h>
-//#include <cmath.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 // %EndTag(INCLUDES)%
 
 
@@ -44,9 +45,14 @@ public:
   void publicaVelocidad(const geometry_msgs::Twist& robotVel)
   {
     double magnitud = sqrt(pow(robotVel.linear.x, 2) + pow(robotVel.angular.z, 2));
+    tf2::Quaternion q;
+    double angle = atan2(robotVel.angular.z, robotVel.linear.x);
+    q.setRPY(angle, angle, angle);  // Create this quaternion from roll/pitch/yaw (in radians)
+    q.normalize();
+    //ROS_INFO_STREAM("x: " << robotVel.linear.x << "; z: " << robotVel.angular.z << "; Angle: "  << angle << "; Quaternion: " << q);
+
     velocity_mark.scale.x = magnitud;
-    velocity_mark.pose.orientation.x = robotVel.linear.x; // TODO: Pasar de Euler a cuaterniones.
-    velocity_mark.pose.orientation.z = robotVel.angular.z;
+    velocity_mark.pose.orientation = tf2::toMsg(q);
     marker_pub.publish(velocity_mark);
   }
 
@@ -71,13 +77,13 @@ private:
     velocity_mark.pose.orientation.y = 0.0;
     velocity_mark.pose.orientation.z = 0.0;
     velocity_mark.pose.orientation.w = 1.0;
-    velocity_mark.scale.x = 0.5;
+    velocity_mark.scale.x = 0.25;
     velocity_mark.scale.y = 0.05;
     velocity_mark.scale.z = 0.05;
     velocity_mark.color.a = 1.0; // Don't forget to set the alpha!
     velocity_mark.color.r = 0.0;
     velocity_mark.color.g = 1.0;
-    velocity_mark.color.b = 0.0;
+    velocity_mark.color.b = 0.5;
   }
 
   /** Agrega los obstáculos al mapa */
