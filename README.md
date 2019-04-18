@@ -11,3 +11,10 @@ rosrun rviz rviz
 rosrun campos_potenciales basic_fields
 roslaunch kobuki_keyop keyop.launch
 ```
+
+En rviz agregar los elementos siguientes:
+
+* **RobotModel**.
+* **Marker**.  *Marker topic:* visualization_marker
+* **Map**.  *Topic:* occupancy_marker
+* **Map**.  *Topic:* occupancy_marker_marcas

@@ -49,7 +49,9 @@ private:
   visualization_msgs::Marker velocity_mark;
 
   ros::Publisher grid_pub;
-  nav_msgs::OccupancyGrid map;
+  ros::Publisher grid_pub_marcas;
+  nav_msgs::OccupancyGrid mapa;
+  nav_msgs::OccupancyGrid mapa_marcas;
 
   ros::NodeHandle& r_n;
 
@@ -66,6 +68,7 @@ public:
   {
     marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
     grid_pub = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
+    grid_pub_marcas = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker_marcas", 1);
     llenaVelocidad();
     llenaMapa();
   }
@@ -93,16 +96,17 @@ public:
     CoordsCelda coords = calculaCelda(odom.pose.pose.position.x, odom.pose.pose.position.y);
     if (_colorPrevio != -1)
     {
-      map.data[_celdaPrevia.i*WIDTH+_celdaPrevia.j] = _colorPrevio;
+      mapa_marcas.data[_celdaPrevia.i*WIDTH+_celdaPrevia.j] = _colorPrevio;
     }
-    _colorPrevio = map.data[coords.i*WIDTH+coords.j];
+    _colorPrevio = mapa_marcas.data[coords.i*WIDTH+coords.j];
     _celdaPrevia = coords;
-    map.data[coords.i*WIDTH+coords.j] = 20;
+    mapa_marcas.data[coords.i*WIDTH+coords.j] = 20;
   }
 
   void publicate()
   {
-    grid_pub.publish(map);
+    grid_pub.publish(mapa);
+    grid_pub_marcas.publish(mapa_marcas);
   }
 
 private:
@@ -134,8 +138,8 @@ private:
   CoordsCelda calculaCelda(double dx, double dy)
   {
     CoordsCelda coords;
-    coords.i = (dy - map.info.origin.position.y) / RESOLUTION;
-    coords.j = (dx - map.info.origin.position.x) / RESOLUTION;
+    coords.i = (dy - mapa.info.origin.position.y) / RESOLUTION;
+    coords.j = (dx - mapa.info.origin.position.x) / RESOLUTION;
     return coords;
   }
 
@@ -145,26 +149,50 @@ private:
     // %Tag(MAP_INIT)%
   
     // http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
-    map.header.frame_id = "/odom";
-    map.header.stamp = ros::Time::now();   // No caduca
+    mapa.header.frame_id = "/odom";
+    mapa.header.stamp = ros::Time::now();   // No caduca
 
-    map.info.resolution = RESOLUTION;      // [m/cell]
-    map.info.width = WIDTH;                // [cells]
-    map.info.height = HEIGHT;              // [cells]
-    map.info.origin.position.x = -RESOLUTION * WIDTH / 2.0;
-    map.info.origin.position.y = -RESOLUTION * HEIGHT / 2.0;
-    map.info.origin.position.z = 0;
-    map.info.origin.orientation.x = 0.0;
-    map.info.origin.orientation.y = 0.0;
-    map.info.origin.orientation.z = 0.0;
-    map.info.origin.orientation.w = 1.0;
+    mapa.info.resolution = RESOLUTION;      // [m/cell]
+    mapa.info.width = WIDTH;                // [cells]
+    mapa.info.height = HEIGHT;              // [cells]
+    mapa.info.origin.position.x = -RESOLUTION * WIDTH / 2.0;
+    mapa.info.origin.position.y = -RESOLUTION * HEIGHT / 2.0;
+    mapa.info.origin.position.z = 0;
+    mapa.info.origin.orientation.x = 0.0;
+    mapa.info.origin.orientation.y = 0.0;
+    mapa.info.origin.orientation.z = 0.0;
+    mapa.info.origin.orientation.w = 1.0;
 
-    //int8[] &_data = &map.data
+
+    /// --- Mapa decorativo para información de depurado
+
+    mapa_marcas.header.frame_id = "/odom";
+    mapa_marcas.header.stamp = ros::Time::now();   // No caduca
+
+    mapa_marcas.info.resolution = RESOLUTION;      // [m/cell]
+    mapa_marcas.info.width = WIDTH;                // [cells]
+    mapa_marcas.info.height = HEIGHT;              // [cells]
+    mapa_marcas.info.origin.position.x = -RESOLUTION * WIDTH / 2.0;
+    mapa_marcas.info.origin.position.y = -RESOLUTION * HEIGHT / 2.0;
+    mapa_marcas.info.origin.position.z = 0.01;
+    mapa_marcas.info.origin.orientation.x = 0.0;
+    mapa_marcas.info.origin.orientation.y = 0.0;
+    mapa_marcas.info.origin.orientation.z = 0.0;
+    mapa_marcas.info.origin.orientation.w = 1.0;
+
+    /// ---
+
+
+    //int8[] &_data = &mapa.data
     int size = WIDTH * HEIGHT;
     char* data = new char[size];
     for(int i = 0; i < size; i++) {
       data[i] = 0;
     }
+
+    /// --- dec
+    mapa_marcas.data = std::vector<int8_t>(data, data + size);
+    /// ---
 
     //data[0] = 50;                               // El origen está en la esquina inferior izquierda.
     fillRectangle(data, 0, 1, 0, WIDTH-1, 100);   // Renglón 0. Las columnas van de 0 a WIDTH-1.  Los renglones corren sobre el eje Y.
@@ -178,8 +206,9 @@ private:
     fillRectangle(data, 11, 17, 13, 22, 100);       // Mesa der2
     fillRectangle(data, 18, 17, 20, 22, 100);       // Mesa der3
 
-    map.data = std::vector<int8_t>(data, data + size);
+    mapa.data = std::vector<int8_t>(data, data + size);
   
+
     // %EndTag(MAP_INIT)%
   }
 
