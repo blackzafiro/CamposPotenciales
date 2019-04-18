@@ -5,6 +5,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <nav_msgs/Odometry.h>
 #include <vector>
 #include <math.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -15,6 +16,28 @@
 /// El eje X es rojo.
 /// El eje Y es verde.
 /// El eje Z apunta hacia arriba y el marcador es azul.
+
+class KobukiVelocity {
+private:
+  double _linear;
+  double _angular;
+
+public:
+  void linear(double linear)
+  {
+    _linear = linear;
+  }
+
+  void angular(double angular)
+  {
+    _angular = angular;
+  }
+};
+
+typedef struct structCoordsCelda {
+  int i;
+  int j;
+} CoordsCelda;
 
 class Mapa {
 private:
@@ -30,10 +53,16 @@ private:
 
   ros::NodeHandle& r_n;
 
+  /// INFO
+  KobukiVelocity k_velocity;
+  nav_msgs::Odometry _odom;
+  CoordsCelda _celdaPrevia;
+  int _colorPrevio;
+
 public:
 
   /** Constructor. */
-  Mapa(ros::NodeHandle& r_n) : r_n(r_n)
+  Mapa(ros::NodeHandle& r_n) : r_n(r_n), _colorPrevio(-1)
   {
     marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
     grid_pub = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
@@ -44,6 +73,8 @@ public:
   /** Recibe la velocidad en coordenadas del robot y publica para rviz. */
   void publicaVelocidad(const geometry_msgs::Twist& robotVel)
   {
+    k_velocity.linear(robotVel.linear.x);
+    k_velocity.angular(robotVel.angular.z);
     double magnitud = sqrt(pow(robotVel.linear.x, 2) + pow(robotVel.angular.z, 2));
     tf2::Quaternion q;
     double angle = atan2(robotVel.angular.z, robotVel.linear.x);
@@ -54,6 +85,19 @@ public:
     velocity_mark.scale.x = magnitud;
     velocity_mark.pose.orientation = tf2::toMsg(q);
     marker_pub.publish(velocity_mark);
+  }
+
+  void leePosicion(const nav_msgs::Odometry& odom)
+  {
+    _odom = odom;
+    CoordsCelda coords = calculaCelda(odom.pose.pose.position.x, odom.pose.pose.position.y);
+    if (_colorPrevio != -1)
+    {
+      map.data[_celdaPrevia.i*WIDTH+_celdaPrevia.j] = _colorPrevio;
+    }
+    _colorPrevio = map.data[coords.i*WIDTH+coords.j];
+    _celdaPrevia = coords;
+    map.data[coords.i*WIDTH+coords.j] = 20;
   }
 
   void publicate()
@@ -84,6 +128,15 @@ private:
     velocity_mark.color.r = 0.0;
     velocity_mark.color.g = 1.0;
     velocity_mark.color.b = 0.5;
+  }
+
+  /** Pasa de las coordenadas según el odométro a los número de celda. */
+  CoordsCelda calculaCelda(double dx, double dy)
+  {
+    CoordsCelda coords;
+    coords.i = (dy - map.info.origin.position.y) / RESOLUTION;
+    coords.j = (dx - map.info.origin.position.x) / RESOLUTION;
+    return coords;
   }
 
   /** Agrega los obstáculos al mapa */
@@ -121,9 +174,9 @@ private:
     fillRectangle(data, 5, 1, 6, 11, 100);          // Mesa izq1
     fillRectangle(data, 11, 1, 13, 11, 100);        // Mesa izq2
     fillRectangle(data, 18, 1, 20, 11, 100);        // Mesa izq3
-    fillRectangle(data, 5, 17, 6, 22, 100);          // Mesa der1
-    fillRectangle(data, 11, 17, 13, 22, 100);          // Mesa der2
-    fillRectangle(data, 18, 17, 20, 22, 100);          // Mesa der3
+    fillRectangle(data, 5, 17, 6, 22, 100);         // Mesa der1
+    fillRectangle(data, 11, 17, 13, 22, 100);       // Mesa der2
+    fillRectangle(data, 18, 17, 20, 22, 100);       // Mesa der3
 
     map.data = std::vector<int8_t>(data, data + size);
   
@@ -172,6 +225,7 @@ int main( int argc, char** argv )
   Mapa mapa(n);
   ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, receiveNavGoal); // Máximo 5 mensajes en la cola.
   ros::Subscriber sub_vel = n.subscribe("/mobile_base/commands/velocity", 2, &Mapa::publicaVelocidad, &mapa); // Máximo 5 mensajes en la cola.
+  ros::Subscriber sub_odom = n.subscribe("/odom", 3, &Mapa::leePosicion, &mapa);
 // %EndTag(INIT)%
 
 
