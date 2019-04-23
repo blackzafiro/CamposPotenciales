@@ -13,6 +13,18 @@
 // %EndTag(INCLUDES)%
 
 
+/**
+ * Devuelve ángulo en el rango [-PI, PI]
+ * @param angulo
+ * @return ángulo normalizado
+ */
+double anguloEnRango(double angulo)
+{
+  angulo = remainder(angulo, 2.0 * M_PI);
+  if (angulo > M_PI) angulo -= 2.0 * M_PI;
+  return angulo;
+}
+
 /// El eje X es rojo.
 /// El eje Y es verde.
 /// El eje Z apunta hacia arriba y el marcador es azul.
@@ -224,6 +236,169 @@ private:
       }
     }
   }
+
+
+  /**
+   * Lanza un rayo a partir de las coordenadas (<code>x</code>,<code>y</code>)
+   * en dirección <code>angulo</code> y devuelve la distancia al obstáculo más
+   * cercano o a un muro en el mapa.
+   * @param x coordenada horizontal, de izquierda a derecha.
+   * @param y coordenada vertical, de arriba a abajo.
+   * @param ángulo dirección en la que se extiende el rayo en radianes.
+   * @param limpia borra las línea usadas para calcular las distancias.
+   * @return distancia
+   */
+  double distanciaAColision(double x, double y, double angulo, bool limpia) {
+        /*if (limpia) {
+            origen[0] = x;
+            origen[1] = y;
+            ilumina.clear();
+            colisiones.clear();
+        }*/
+        angulo = anguloEnRango(angulo);
+        double m = tan(angulo);
+        double b = - y - m * x;  // y está invertida
+        CoordsCelda ij = calculaCelda(x, y);
+        int i = ij.i, j = ij.j;
+        double xn, yn;
+        
+        if (angulo > 0) {
+            if (angulo < M_PI/2) {
+                // Primer cuadrante
+                int l = i, k = j;
+                // arriba y a la derecha
+                while(k < mapaDiscretizado[0].length && l >= 0) {
+                    int[] indx = {l, k};
+                    ilumina.add(indx);
+     
+                    xn = (k + 1) * anchoCelda;
+                    yn = y - m * (xn - x);
+                    if (yn < (l + 1) * anchoCelda && yn > l * anchoCelda) {
+                        k++; // ve a la derecha
+                        if (k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            //System.out.println("Caso 1");
+                            return colision(x, y, xn, yn);
+                        }
+                    } else if (yn == l * anchoCelda) {
+                        k++; // a la derecha
+                        l--; // arriba
+                        if (l < 0 || k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            //System.out.println("Caso 2");
+                            return colision(x, y, xn, yn);
+                        }
+                    } else {
+                        l--; // arriba
+                        
+                        yn = (l + 1) * anchoCelda;
+                        xn = (-yn - b)/m;
+                        if (l < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {    
+                            //System.out.println("Caso 3");
+                            return colision(x, y, xn, yn);
+                        }
+                    }
+                }
+            } else if (angulo <= M_PI) {
+                // Segundo cuadrante
+                int l = i, k = j;
+                // arriba y a la izquierda
+                while(k >= 0 && l >= 0) {
+                    int[] indx = {l, k};
+                    ilumina.add(indx);
+                    yn = l * anchoCelda;
+                    xn = (-yn - b)/m;
+                    if (xn > k * anchoCelda && xn < (k + 1) * anchoCelda) {
+                        l--; // ve arriba
+                        if (l < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            return colision(x, y, xn, yn);
+                        }
+                    } else if (xn == (k + 1) * anchoCelda) {
+                        k--; // a la izquierda
+                        l--; // arriba
+                        if (l < 0 || k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            return colision(x, y, xn, yn);
+                        }
+                    } else {
+                        k--; // a la izquierda
+                        xn = (k + 1) * anchoCelda;
+                            yn = y - m * (xn - x);
+                        if (k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            return colision(x, y, xn, yn);
+                        }
+                    }
+                }
+            }
+        } else {
+            if (angulo > -M_PI/2) {
+                // Cuarto cuadrante
+                int l = i, k = j;
+                // abajo y a la derecha
+                while(k < mapaDiscretizado[0].length && l < mapaDiscretizado.length) {
+                    int[] indx = {l, k};
+                    ilumina.add(indx);
+     
+                    xn = (k + 1) * anchoCelda;
+                    yn = y - m * (xn - x);
+                    if (yn < (l + 1) * anchoCelda && yn > l * anchoCelda) {
+                        k++; // ve a la derecha
+                        if (k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            //System.out.println("Caso 1");
+                            return colision(x, y, xn, yn);
+                        }
+                    } else if (yn == (l + 1) * anchoCelda) {
+                        k++; // a la derecha
+                        l++; // abajo
+                        if (l == this.mapaDiscretizado.length || k == mapaDiscretizado[0].length && this.mapaDiscretizado[l][k] == OCUPADA) {
+                            //System.out.println("Caso 2");
+                            return colision(x, y, xn, yn);
+                        }
+                    } else {
+                        l++; // abajo
+                        if (l == this.mapaDiscretizado.length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            yn = l * anchoCelda;
+                            xn = (-yn - b)/m;
+                            //System.out.println("Caso 3");
+                            return colision(x, y, xn, yn);
+                        }
+                    }
+                }
+            } else if (angulo > -M_PI) {
+                // Tercer cuadrante
+                int l = i, k = j;
+                // abajo y a la izquierda
+                while(k >= 0 && l < this.mapaDiscretizado.length) {
+                    int[] indx = {l, k};
+                    ilumina.add(indx);
+                    yn = (l + 1) * anchoCelda;
+                    xn = (-yn - b)/m;
+                    if (xn > k * anchoCelda && xn < (k + 1) * anchoCelda) {
+                        l++; // ve abajo
+                        if (l == this.mapaDiscretizado.length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            return colision(x, y, xn, yn);
+                        }
+                    } else if (xn == (k + 1) * anchoCelda) {
+                        k--; // a la izquierda
+                        l++; // ve abajo
+                        if (l == this.mapaDiscretizado.length || k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            return colision(x, y, xn, yn);
+                        }
+                    } else {
+                        k--; // a la izquierda
+                        if (k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                            xn = (k + 1) * anchoCelda;
+                            yn = y - m * (xn - x);
+                            
+                            return colision(x, y, xn, yn);
+                        }
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+
+
+
 };
 
 
