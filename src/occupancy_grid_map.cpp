@@ -56,6 +56,7 @@ private:
   const int WIDTH = 24;          /// A lo largo del eje rojo x
   const int HEIGHT = 31;         /// A lo largo del eje verde
   const float RESOLUTION = 0.3f; /// [m/cell]
+  const int OCUPADA = 100;
 
   ros::Publisher marker_pub;
   visualization_msgs::Marker velocity_mark;
@@ -207,21 +208,28 @@ private:
     /// ---
 
     //data[0] = 50;                               // El origen está en la esquina inferior izquierda.
-    fillRectangle(data, 0, 1, 0, WIDTH-1, 100);   // Renglón 0. Las columnas van de 0 a WIDTH-1.  Los renglones corren sobre el eje Y.
-    fillRectangle(data, 0, 0, HEIGHT-1, 0, 100);  // Columna 0. Los renglones va de 0 a HEIGHT-1.  Las columnas corren sobre el eje X.
-    fillRectangle(data, HEIGHT-1, 1, HEIGHT-1, WIDTH-1, 100);
-    fillRectangle(data, 1, WIDTH-1, HEIGHT-1, WIDTH-1, 100);
-    fillRectangle(data, 5, 1, 6, 11, 100);          // Mesa izq1
-    fillRectangle(data, 11, 1, 13, 11, 100);        // Mesa izq2
-    fillRectangle(data, 18, 1, 20, 11, 100);        // Mesa izq3
-    fillRectangle(data, 5, 17, 6, 22, 100);         // Mesa der1
-    fillRectangle(data, 11, 17, 13, 22, 100);       // Mesa der2
-    fillRectangle(data, 18, 17, 20, 22, 100);       // Mesa der3
+    fillRectangle(data, 0, 1, 0, WIDTH-1, OCUPADA);   // Renglón 0. Las columnas van de 0 a WIDTH-1.  Los renglones corren sobre el eje Y.
+    fillRectangle(data, 0, 0, HEIGHT-1, 0, OCUPADA);  // Columna 0. Los renglones va de 0 a HEIGHT-1.  Las columnas corren sobre el eje X.
+    fillRectangle(data, HEIGHT-1, 1, HEIGHT-1, WIDTH-1, OCUPADA);
+    fillRectangle(data, 1, WIDTH-1, HEIGHT-1, WIDTH-1, OCUPADA);
+    fillRectangle(data, 5, 1, 6, 11, OCUPADA);          // Mesa izq1
+    fillRectangle(data, 11, 1, 13, 11, OCUPADA);        // Mesa izq2
+    fillRectangle(data, 18, 1, 20, 11, OCUPADA);        // Mesa izq3
+    fillRectangle(data, 5, 17, 6, 22, OCUPADA);         // Mesa der1
+    fillRectangle(data, 11, 17, 13, 22, OCUPADA);       // Mesa der2
+    fillRectangle(data, 18, 17, 20, 22, OCUPADA);       // Mesa der3
 
     mapa.data = std::vector<int8_t>(data, data + size);
   
 
     // %EndTag(MAP_INIT)%
+  }
+
+
+  /** Devuelve el índice del arreglo unidimensional donde está el mapa 2D. */
+  int mInd(int i, int j)
+  {
+    return i*WIDTH+j;
   }
 
 
@@ -232,11 +240,25 @@ private:
     {
       for(int j = j1; j <= j2; j++)
       {
-        data[i*WIDTH+j] = value;
+        data[mInd(i, j)] = value;
       }
     }
   }
 
+
+  /**
+     * Acciones a realizar cuando se ha detectado una colisión.
+     * @param x coordenada x del origen del rayo
+     * @param y coordenada y del origen del rayo
+     * @param xn
+     * @param yn
+     * @return 
+     */
+  double colision(double x, double y, double xn, double yn) {
+    //float[] colision = {(float)xn, (float)yn};
+    //colisiones.add(colision);
+    return sqrt(pow(xn - x, 2) + pow(yn - y, 2));
+  }
 
   /**
    * Lanza un rayo a partir de las coordenadas (<code>x</code>,<code>y</code>)
@@ -267,31 +289,31 @@ private:
                 // Primer cuadrante
                 int l = i, k = j;
                 // arriba y a la derecha
-                while(k < mapaDiscretizado[0].length && l >= 0) {
-                    int[] indx = {l, k};
-                    ilumina.add(indx);
+                while(k < WIDTH && l >= 0) {
+                    //int indx[2] = {l, k};
+                    //ilumina.add(indx);
      
-                    xn = (k + 1) * anchoCelda;
+                    xn = (k + 1) * RESOLUTION;
                     yn = y - m * (xn - x);
-                    if (yn < (l + 1) * anchoCelda && yn > l * anchoCelda) {
+                    if (yn < (l + 1) * RESOLUTION && yn > l * RESOLUTION) {
                         k++; // ve a la derecha
-                        if (k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (k == WIDTH || mapa.data[mInd(l, k)] == OCUPADA) {
                             //System.out.println("Caso 1");
                             return colision(x, y, xn, yn);
                         }
-                    } else if (yn == l * anchoCelda) {
+                    } else if (yn == l * RESOLUTION) {
                         k++; // a la derecha
                         l--; // arriba
-                        if (l < 0 || k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l < 0 || k == WIDTH || mapa.data[mInd(l, k)] == OCUPADA) {
                             //System.out.println("Caso 2");
                             return colision(x, y, xn, yn);
                         }
                     } else {
                         l--; // arriba
                         
-                        yn = (l + 1) * anchoCelda;
+                        yn = (l + 1) * RESOLUTION;
                         xn = (-yn - b)/m;
-                        if (l < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {    
+                        if (l < 0 || mapa.data[mInd(l, k)] == OCUPADA) {    
                             //System.out.println("Caso 3");
                             return colision(x, y, xn, yn);
                         }
@@ -302,26 +324,26 @@ private:
                 int l = i, k = j;
                 // arriba y a la izquierda
                 while(k >= 0 && l >= 0) {
-                    int[] indx = {l, k};
-                    ilumina.add(indx);
-                    yn = l * anchoCelda;
+                    //int[] indx = {l, k};
+                    //ilumina.add(indx);
+                    yn = l * RESOLUTION;
                     xn = (-yn - b)/m;
-                    if (xn > k * anchoCelda && xn < (k + 1) * anchoCelda) {
+                    if (xn > k * RESOLUTION && xn < (k + 1) * RESOLUTION) {
                         l--; // ve arriba
-                        if (l < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             return colision(x, y, xn, yn);
                         }
-                    } else if (xn == (k + 1) * anchoCelda) {
+                    } else if (xn == (k + 1) * RESOLUTION) {
                         k--; // a la izquierda
                         l--; // arriba
-                        if (l < 0 || k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l < 0 || k < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             return colision(x, y, xn, yn);
                         }
                     } else {
                         k--; // a la izquierda
-                        xn = (k + 1) * anchoCelda;
+                        xn = (k + 1) * RESOLUTION;
                             yn = y - m * (xn - x);
-                        if (k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (k < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             return colision(x, y, xn, yn);
                         }
                     }
@@ -332,29 +354,29 @@ private:
                 // Cuarto cuadrante
                 int l = i, k = j;
                 // abajo y a la derecha
-                while(k < mapaDiscretizado[0].length && l < mapaDiscretizado.length) {
-                    int[] indx = {l, k};
-                    ilumina.add(indx);
+                while(k < WIDTH && l < HEIGHT) {
+                    //int[] indx = {l, k};
+                    //ilumina.add(indx);
      
-                    xn = (k + 1) * anchoCelda;
+                    xn = (k + 1) * RESOLUTION;
                     yn = y - m * (xn - x);
-                    if (yn < (l + 1) * anchoCelda && yn > l * anchoCelda) {
+                    if (yn < (l + 1) * RESOLUTION && yn > l * RESOLUTION) {
                         k++; // ve a la derecha
-                        if (k == mapaDiscretizado[0].length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (k == WIDTH || mapa.data[mInd(l, k)] == OCUPADA) {
                             //System.out.println("Caso 1");
                             return colision(x, y, xn, yn);
                         }
-                    } else if (yn == (l + 1) * anchoCelda) {
+                    } else if (yn == (l + 1) * RESOLUTION) {
                         k++; // a la derecha
                         l++; // abajo
-                        if (l == this.mapaDiscretizado.length || k == mapaDiscretizado[0].length && this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l == HEIGHT || k == WIDTH && mapa.data[mInd(l, k)] == OCUPADA) {
                             //System.out.println("Caso 2");
                             return colision(x, y, xn, yn);
                         }
                     } else {
                         l++; // abajo
-                        if (l == this.mapaDiscretizado.length || this.mapaDiscretizado[l][k] == OCUPADA) {
-                            yn = l * anchoCelda;
+                        if (l == HEIGHT || mapa.data[mInd(l, k)] == OCUPADA) {
+                            yn = l * RESOLUTION;
                             xn = (-yn - b)/m;
                             //System.out.println("Caso 3");
                             return colision(x, y, xn, yn);
@@ -365,26 +387,26 @@ private:
                 // Tercer cuadrante
                 int l = i, k = j;
                 // abajo y a la izquierda
-                while(k >= 0 && l < this.mapaDiscretizado.length) {
-                    int[] indx = {l, k};
-                    ilumina.add(indx);
-                    yn = (l + 1) * anchoCelda;
+                while(k >= 0 && l < HEIGHT) {
+                    //int[] indx = {l, k};
+                    //ilumina.add(indx);
+                    yn = (l + 1) * RESOLUTION;
                     xn = (-yn - b)/m;
-                    if (xn > k * anchoCelda && xn < (k + 1) * anchoCelda) {
+                    if (xn > k * RESOLUTION && xn < (k + 1) * RESOLUTION) {
                         l++; // ve abajo
-                        if (l == this.mapaDiscretizado.length || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l == HEIGHT || mapa.data[mInd(l, k)] == OCUPADA) {
                             return colision(x, y, xn, yn);
                         }
-                    } else if (xn == (k + 1) * anchoCelda) {
+                    } else if (xn == (k + 1) * RESOLUTION) {
                         k--; // a la izquierda
                         l++; // ve abajo
-                        if (l == this.mapaDiscretizado.length || k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
+                        if (l == HEIGHT || k < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             return colision(x, y, xn, yn);
                         }
                     } else {
                         k--; // a la izquierda
-                        if (k < 0 || this.mapaDiscretizado[l][k] == OCUPADA) {
-                            xn = (k + 1) * anchoCelda;
+                        if (k < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
+                            xn = (k + 1) * RESOLUTION;
                             yn = y - m * (xn - x);
                             
                             return colision(x, y, xn, yn);
