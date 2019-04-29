@@ -13,6 +13,53 @@
 // %EndTag(INCLUDES)%
 
 
+///
+/// Clases que contienen información
+///
+
+class VelocidadKobuki {
+private:
+  double _linear;
+  double _angular;
+
+public:
+  void linear(double linear)
+  {
+    _linear = linear;
+  }
+
+  void angular(double angular)
+  {
+    _angular = angular;
+  }
+};
+
+/**
+ * Localización del robot en el piso, con orientación.
+ */
+class Loc2D
+{
+private:
+  double _x;
+  double _y;
+  double _angulo;
+
+public:
+  Loc2D() : _x(0), _y(0), _angulo(0) {}
+  Loc2D(double x, double y, double angulo) : _x(x), _y(y), _angulo(angulo){}
+  double x() { return _x; }
+  double y() { return _y; }
+  double ang() { return _angulo; }
+  void x(double x) { this->_x = x; }
+  void y(double y) { this->_y = y; }
+  void ang(double angulo) { this->_angulo = angulo; }
+};
+
+
+///
+/// Funciones auxiliares
+///
+
 /**
  * Devuelve ángulo en el rango [-PI, PI]
  * @param angulo
@@ -29,22 +76,42 @@ double anguloEnRango(double angulo)
 /// El eje Y es verde.
 /// El eje Z apunta hacia arriba y el marcador es azul.
 
-class KobukiVelocity {
+class Sonar
+{
 private:
-  double _linear;
-  double _angular;
+  double angulo;  // Ángulo con respecto al frente del robot
 
 public:
-  void linear(double linear)
+  /** Obtiene las coordenadas del sensor dado el centro del robot. */
+  Loc2D getPosicion(double xr, double yr)
   {
-    _linear = linear;
-  }
 
-  void angular(double angular)
-  {
-    _angular = angular;
   }
 };
+
+class RobotInfo
+{
+private:
+  VelocidadKobuki _velocidad;
+  Loc2D _posicion;
+
+public:
+  void extraePosicion(const nav_msgs::Odometry& odom)
+  {
+    _posicion.x(odom.pose.pose.position.x);
+    _posicion.y(odom.pose.pose.position.y);
+
+    // TODO
+    //tf2::Quaternion q;
+    //_posicion.ang(odom.pose.pose.orientation);
+  }
+
+  VelocidadKobuki& velocidad() { return _velocidad; }
+
+  Loc2D& posicion() { return _posicion; }
+};
+
+
 
 typedef struct structCoordsCelda {
   int i;
@@ -69,8 +136,7 @@ private:
   ros::NodeHandle& r_n;
 
   /// INFO
-  KobukiVelocity k_velocity;
-  nav_msgs::Odometry _odom;
+  RobotInfo _robot_info;
   CoordsCelda _celdaPrevia;
   int _colorPrevio;
 
@@ -89,12 +155,12 @@ public:
   /** Recibe la velocidad en coordenadas del robot y publica para rviz. */
   void publicaVelocidad(const geometry_msgs::Twist& robotVel)
   {
-    k_velocity.linear(robotVel.linear.x);
-    k_velocity.angular(robotVel.angular.z);
+    _robot_info.velocidad().linear(robotVel.linear.x);
+    _robot_info.velocidad().angular(robotVel.angular.z);
     double magnitud = sqrt(pow(robotVel.linear.x, 2) + pow(robotVel.angular.z, 2));
     tf2::Quaternion q;
     double angle = atan2(robotVel.angular.z, robotVel.linear.x);
-    q.setRPY(angle, angle, angle);  // Create this quaternion from roll/pitch/yaw (in radians)
+    q.setRPY(0, 0, angle);  // Create this quaternion from roll/pitch/yaw (in radians)
     q.normalize();
     //ROS_INFO_STREAM("x: " << robotVel.linear.x << "; z: " << robotVel.angular.z << "; Angle: "  << angle << "; Quaternion: " << q);
 
@@ -105,8 +171,8 @@ public:
 
   void leePosicion(const nav_msgs::Odometry& odom)
   {
-    _odom = odom;
-    CoordsCelda coords = calculaCelda(odom.pose.pose.position.x, odom.pose.pose.position.y);
+    _robot_info.extraePosicion(odom);
+    CoordsCelda coords = calculaCelda(_robot_info.posicion().x(), _robot_info.posicion().y());
     if (_colorPrevio != -1)
     {
       mapa_marcas.data[_celdaPrevia.i*WIDTH+_celdaPrevia.j] = _colorPrevio;
@@ -114,6 +180,8 @@ public:
     _colorPrevio = mapa_marcas.data[coords.i*WIDTH+coords.j];
     _celdaPrevia = coords;
     mapa_marcas.data[coords.i*WIDTH+coords.j] = 20;
+
+    _robot_info.extraePosicion(odom);
   }
 
   void publicate()
@@ -160,7 +228,7 @@ private:
   void llenaMapa()
   {
     // %Tag(MAP_INIT)%
-  
+
     // http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html
     mapa.header.frame_id = "/odom";
     mapa.header.stamp = ros::Time::now();   // No caduca
@@ -220,7 +288,7 @@ private:
     fillRectangle(data, 18, 17, 20, 22, OCUPADA);       // Mesa der3
 
     mapa.data = std::vector<int8_t>(data, data + size);
-  
+
 
     // %EndTag(MAP_INIT)%
   }
@@ -252,9 +320,10 @@ private:
      * @param y coordenada y del origen del rayo
      * @param xn
      * @param yn
-     * @return 
+     * @return
      */
-  double colision(double x, double y, double xn, double yn) {
+  double colision(double x, double y, double xn, double yn)
+  {
     //float[] colision = {(float)xn, (float)yn};
     //colisiones.add(colision);
     return sqrt(pow(xn - x, 2) + pow(yn - y, 2));
@@ -283,7 +352,7 @@ private:
         CoordsCelda ij = calculaCelda(x, y);
         int i = ij.i, j = ij.j;
         double xn, yn;
-        
+
         if (angulo > 0) {
             if (angulo < M_PI/2) {
                 // Primer cuadrante
@@ -292,7 +361,7 @@ private:
                 while(k < WIDTH && l >= 0) {
                     //int indx[2] = {l, k};
                     //ilumina.add(indx);
-     
+
                     xn = (k + 1) * RESOLUTION;
                     yn = y - m * (xn - x);
                     if (yn < (l + 1) * RESOLUTION && yn > l * RESOLUTION) {
@@ -310,10 +379,10 @@ private:
                         }
                     } else {
                         l--; // arriba
-                        
+
                         yn = (l + 1) * RESOLUTION;
                         xn = (-yn - b)/m;
-                        if (l < 0 || mapa.data[mInd(l, k)] == OCUPADA) {    
+                        if (l < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             //System.out.println("Caso 3");
                             return colision(x, y, xn, yn);
                         }
@@ -357,7 +426,7 @@ private:
                 while(k < WIDTH && l < HEIGHT) {
                     //int[] indx = {l, k};
                     //ilumina.add(indx);
-     
+
                     xn = (k + 1) * RESOLUTION;
                     yn = y - m * (xn - x);
                     if (yn < (l + 1) * RESOLUTION && yn > l * RESOLUTION) {
@@ -408,7 +477,7 @@ private:
                         if (k < 0 || mapa.data[mInd(l, k)] == OCUPADA) {
                             xn = (k + 1) * RESOLUTION;
                             yn = y - m * (xn - x);
-                            
+
                             return colision(x, y, xn, yn);
                         }
                     }
