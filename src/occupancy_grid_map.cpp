@@ -82,6 +82,10 @@ private:
   double angulo;  // Ángulo con respecto al frente del robot
 
 public:
+  /** Constructores */
+  Sonar() : angulo(0) {}
+  Sonar(double angulo) : angulo(angulo) {}
+
   /** Obtiene las coordenadas del sensor dado el centro del robot. */
   Loc2D getPosicion(double xr, double yr)
   {
@@ -95,7 +99,25 @@ private:
   VelocidadKobuki _velocidad;
   Loc2D _posicion;
 
+  static const int NUM_SONARES = 6;
+  Sonar sonares[NUM_SONARES];
+
 public:
+  /** Inicializa la información del robot. */
+  RobotInfo()
+  {
+    // Inicializa simulación de sonares.
+    iniciaSonares();
+  }
+
+  void iniciaSonares()
+  {
+    for(int i = 0; i < NUM_SONARES; i++)
+    {
+      sonares[i] = Sonar(2 * M_PI * i / NUM_SONARES);
+    }
+  }
+
   void extraePosicion(const nav_msgs::Odometry& odom)
   {
     _posicion.x(odom.pose.pose.position.x);
