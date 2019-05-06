@@ -160,7 +160,7 @@ public:
     double magnitud = sqrt(pow(robotVel.linear.x, 2) + pow(robotVel.angular.z, 2));
     tf2::Quaternion q;
     double angle = atan2(robotVel.angular.z, robotVel.linear.x);
-    q.setRPY(0, 0, angle);  // Create this quaternion from roll/pitch/yaw (in radians)
+    q.setRPY(angle, angle, angle);  // Create this quaternion from roll/pitch/yaw (in radians)
     q.normalize();
     //ROS_INFO_STREAM("x: " << robotVel.linear.x << "; z: " << robotVel.angular.z << "; Angle: "  << angle << "; Quaternion: " << q);
 
