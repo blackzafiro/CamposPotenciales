@@ -5,6 +5,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Point.h>
 #include <nav_msgs/Odometry.h>
 #include <vector>
 #include <math.h>
@@ -148,7 +149,9 @@ private:
   const int OCUPADA = 100;
 
   ros::Publisher marker_pub;
-  visualization_msgs::Marker velocity_mark;
+  visualization_msgs::Marker marca_velocidad;
+  ros::Publisher meta_pub;
+  visualization_msgs::Marker marca_meta;
 
   ros::Publisher grid_pub;
   ros::Publisher grid_pub_marcas;
@@ -168,9 +171,11 @@ public:
   Mapa(ros::NodeHandle& r_n) : r_n(r_n), _colorPrevio(-1)
   {
     marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+    meta_pub = r_n.advertise<visualization_msgs::Marker>("marca_meta", 1);
     grid_pub = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
     grid_pub_marcas = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker_marcas", 1);
     llenaVelocidad();
+    llenaMeta();
     llenaMapa();
   }
 
@@ -186,9 +191,9 @@ public:
     q.normalize();
     //ROS_INFO_STREAM("x: " << robotVel.linear.x << "; z: " << robotVel.angular.z << "; Angle: "  << angle << "; Quaternion: " << q);
 
-    velocity_mark.scale.x = magnitud;
-    velocity_mark.pose.orientation = tf2::toMsg(q);
-    marker_pub.publish(velocity_mark);
+    marca_velocidad.scale.x = magnitud;
+    marca_velocidad.pose.orientation = tf2::toMsg(q);
+    marker_pub.publish(marca_velocidad);
   }
 
   void leePosicion(const nav_msgs::Odometry& odom)
@@ -204,6 +209,34 @@ public:
     mapa_marcas.data[coords.i*WIDTH+coords.j] = 20;
 
     _robot_info.extraePosicion(odom);
+    marca_meta.points[0].x = odom.pose.pose.position.x; //_robot_info.posicion().x();
+    marca_meta.points[0].y = odom.pose.pose.position.y; //_robot_info.posicion().y();
+    meta_pub.publish(marca_meta);
+  }
+
+  /** Receives the message of the navigation goal from rviz. */
+  void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
+  {
+    marca_meta.points[1].x = poseStamped.pose.position.x;
+    marca_meta.points[1].y = poseStamped.pose.position.y;
+    marca_meta.points[1].z = poseStamped.pose.position.z;
+    meta_pub.publish(marca_meta);
+    ROS_INFO("\nFrame: %s\nMove to: [%f, %f, %f] - [%f, %f, %f, %f]\n(%f, %f, %f) -> (%f, %f, %f)",
+             poseStamped.header.frame_id.c_str(),
+             poseStamped.pose.position.x,
+             poseStamped.pose.position.y,
+             poseStamped.pose.position.z,
+             poseStamped.pose.orientation.x,
+             poseStamped.pose.orientation.y,
+             poseStamped.pose.orientation.z,
+             poseStamped.pose.orientation.w,
+             marca_meta.points[0].x,
+             marca_meta.points[0].y,
+             marca_meta.points[0].z,
+             marca_meta.points[1].x,
+             marca_meta.points[1].y,
+             marca_meta.points[1].z
+           );
   }
 
   void publicate()
@@ -215,26 +248,58 @@ public:
 private:
   void llenaVelocidad()
   {
-    velocity_mark.header.frame_id = "base_link";
-    velocity_mark.header.stamp = ros::Time();
-    velocity_mark.ns = "kobu_namespace";
-    velocity_mark.id = 0;
-    velocity_mark.type = visualization_msgs::Marker::ARROW;
-    velocity_mark.action = visualization_msgs::Marker::ADD;
-    velocity_mark.pose.position.x = 0;
-    velocity_mark.pose.position.y = 0;
-    velocity_mark.pose.position.z = 0.2;
-    velocity_mark.pose.orientation.x = 0.0;
-    velocity_mark.pose.orientation.y = 0.0;
-    velocity_mark.pose.orientation.z = 0.0;
-    velocity_mark.pose.orientation.w = 1.0;
-    velocity_mark.scale.x = 0.25;
-    velocity_mark.scale.y = 0.05;
-    velocity_mark.scale.z = 0.05;
-    velocity_mark.color.a = 1.0; // Don't forget to set the alpha!
-    velocity_mark.color.r = 0.0;
-    velocity_mark.color.g = 1.0;
-    velocity_mark.color.b = 0.5;
+    marca_velocidad.header.frame_id = "base_link";
+    marca_velocidad.header.stamp = ros::Time();
+    marca_velocidad.ns = "kobu_namespace";
+    marca_velocidad.id = 0;
+    marca_velocidad.type = visualization_msgs::Marker::ARROW;
+    marca_velocidad.action = visualization_msgs::Marker::ADD;
+    marca_velocidad.pose.position.x = 0;
+    marca_velocidad.pose.position.y = 0;
+    marca_velocidad.pose.position.z = 0.2;
+    marca_velocidad.pose.orientation.x = 0.0;
+    marca_velocidad.pose.orientation.y = 0.0;
+    marca_velocidad.pose.orientation.z = 0.0;
+    marca_velocidad.pose.orientation.w = 1.0;
+    marca_velocidad.scale.x = 0.25;
+    marca_velocidad.scale.y = 0.05;
+    marca_velocidad.scale.z = 0.05;
+    marca_velocidad.color.a = 1.0; // Don't forget to set the alpha!
+    marca_velocidad.color.r = 0.0;
+    marca_velocidad.color.g = 1.0;
+    marca_velocidad.color.b = 0.5;
+  }
+
+  void llenaMeta()
+  {
+    marca_meta.header.frame_id = "odom";
+    marca_meta.header.stamp = ros::Time();
+    marca_meta.ns = "kobu_namespace";
+    marca_meta.id = 0;
+    marca_meta.type = visualization_msgs::Marker::ARROW;
+    marca_meta.action = visualization_msgs::Marker::ADD;
+    marca_meta.pose.position.x = 0;
+    marca_meta.pose.position.y = 0;
+    marca_meta.pose.position.z = 0;
+    marca_meta.pose.orientation.x = 0.0;
+    marca_meta.pose.orientation.y = 0.0;
+    marca_meta.pose.orientation.z = 0.0;
+    marca_meta.pose.orientation.w = 1.0;
+    geometry_msgs::Point extremos[2];
+    extremos[0].x = 0.0;
+    extremos[0].y = 0.0;
+    extremos[0].z = 0.0;
+    extremos[1].x = 0.0;
+    extremos[1].y = 0.0;
+    extremos[1].z = 0.0;
+    marca_meta.points = std::vector<geometry_msgs::Point>(extremos, extremos + 2);;
+    marca_meta.scale.x = 0.025;
+    marca_meta.scale.y = 0.05;
+    marca_meta.scale.z = 0.05;
+    marca_meta.color.a = 1.0; // Don't forget to set the alpha!
+    marca_meta.color.r = 1.0;
+    marca_meta.color.g = 0.1;
+    marca_meta.color.b = 0.2;
   }
 
   /** Pasa de las coordenadas según el odométro a los número de celda. */
@@ -510,25 +575,8 @@ private:
     }
 
 
-
-
 };
 
-
-
-/** Receives the message of the navigation goal from rviz. */
-void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
-{
-  ROS_INFO("\nFrame: %s\nMove to: [%f, %f, %f] - [%f, %f, %f, %f]",
-           poseStamped.header.frame_id.c_str(),
-           poseStamped.pose.position.x,
-           poseStamped.pose.position.y,
-           poseStamped.pose.position.z,
-           poseStamped.pose.orientation.x,
-           poseStamped.pose.orientation.y,
-           poseStamped.pose.orientation.z,
-           poseStamped.pose.orientation.w);
-}
 
 
 
@@ -538,9 +586,8 @@ int main( int argc, char** argv )
   ros::init(argc, argv, "basic_map");
   ros::NodeHandle n;
   ros::Rate r(1);
-  //ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
   Mapa mapa(n);
-  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, receiveNavGoal); // Máximo 5 mensajes en la cola.
+  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, &Mapa::receiveNavGoal, &mapa); // Máximo 5 mensajes en la cola.
   ros::Subscriber sub_vel = n.subscribe("/mobile_base/commands/velocity", 2, &Mapa::publicaVelocidad, &mapa); // Máximo 5 mensajes en la cola.
   ros::Subscriber sub_odom = n.subscribe("/odom", 3, &Mapa::leePosicion, &mapa);
 // %EndTag(INIT)%
