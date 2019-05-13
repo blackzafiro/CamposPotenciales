@@ -80,12 +80,14 @@ double anguloEnRango(double angulo)
 class Sonar
 {
 private:
-  double angulo;  // Ángulo con respecto al frente del robot
+  double _angulo;  // Ángulo con respecto al frente del robot
 
 public:
   /** Constructores */
-  Sonar() : angulo(0) {}
-  Sonar(double angulo) : angulo(angulo) {}
+  Sonar() : _angulo(0) {}
+  Sonar(double angulo) : _angulo(angulo) {}
+
+  double angulo() { return _angulo; }
 
   /** Obtiene las coordenadas del sensor dado el centro del robot. */
   Loc2D getPosicion(double xr, double yr)
@@ -100,15 +102,47 @@ private:
   VelocidadKobuki _velocidad;
   Loc2D _posicion;
 
+  float RADIO = 0.175;  // 17.5cm
   static const int NUM_SONARES = 6;
   Sonar sonares[NUM_SONARES];
 
+  ros::Publisher marcas_sonar_pub;
+  visualization_msgs::Marker sonar_line_list;
+
+  void llenaLineaSonares()
+  {
+    sonar_line_list.header.frame_id = "base_link";
+    sonar_line_list.header.stamp = ros::Time();
+    sonar_line_list.ns = "kobu_namespace";
+    sonar_line_list.action = visualization_msgs::Marker::ADD;
+    sonar_line_list.pose.orientation.w = 1.0;
+    sonar_line_list.id = 0;
+    sonar_line_list.type = visualization_msgs::Marker::LINE_LIST;
+    sonar_line_list.scale.x = 0.1;
+    sonar_line_list.color.b = 1.0;
+    sonar_line_list.color.a = 1.0;
+
+    for (int i = 0; i < NUM_SONARES; i++)
+    {
+      geometry_msgs::Point p;
+      p.x = _posicion.x();
+      p.y = _posicion.y();
+      p.z = 0.0;
+      sonar_line_list.points.push_back(p);
+      p.x += cos(sonares[i].angulo());
+      p.y += sin(sonares[i].angulo());
+      sonar_line_list.points.push_back(p);
+    }
+  }
+
 public:
   /** Inicializa la información del robot. */
-  RobotInfo()
+  RobotInfo(ros::NodeHandle& r_n)
   {
     // Inicializa simulación de sonares.
     iniciaSonares();
+    marcas_sonar_pub = r_n.advertise<visualization_msgs::Marker>("marcas_sonares", 10);
+    llenaLineaSonares();
   }
 
   void iniciaSonares()
@@ -132,6 +166,11 @@ public:
   VelocidadKobuki& velocidad() { return _velocidad; }
 
   Loc2D& posicion() { return _posicion; }
+
+  void publicaSonares()
+  {
+    marcas_sonar_pub.publish(sonar_line_list);
+  }
 };
 
 
@@ -150,6 +189,7 @@ private:
 
   ros::Publisher marker_pub;
   visualization_msgs::Marker marca_velocidad;
+  bool _navegando;
   ros::Publisher meta_pub;
   visualization_msgs::Marker marca_meta;
 
@@ -168,7 +208,7 @@ private:
 public:
 
   /** Constructor. */
-  Mapa(ros::NodeHandle& r_n) : r_n(r_n), _colorPrevio(-1)
+  Mapa(ros::NodeHandle& r_n) : r_n(r_n), _colorPrevio(-1), _navegando(false), _robot_info(r_n)
   {
     marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
     meta_pub = r_n.advertise<visualization_msgs::Marker>("marca_meta", 1);
@@ -209,14 +249,20 @@ public:
     mapa_marcas.data[coords.i*WIDTH+coords.j] = 20;
 
     _robot_info.extraePosicion(odom);
+
     marca_meta.points[0].x = odom.pose.pose.position.x; //_robot_info.posicion().x();
     marca_meta.points[0].y = odom.pose.pose.position.y; //_robot_info.posicion().y();
-    meta_pub.publish(marca_meta);
+    if (_navegando)
+    {
+      meta_pub.publish(marca_meta);
+    }
+    _robot_info.publicaSonares();
   }
 
   /** Receives the message of the navigation goal from rviz. */
   void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
   {
+    _navegando = true;
     marca_meta.points[1].x = poseStamped.pose.position.x;
     marca_meta.points[1].y = poseStamped.pose.position.y;
     marca_meta.points[1].z = poseStamped.pose.position.z;

@@ -17,5 +17,6 @@ En rviz agregar los elementos siguientes:
 * **RobotModel**.
 * **Marker**.  *Marker topic:* visualization_marker
 * **Marker**. *Marker topic:* marca_meta
+* **Marker**. *Marker topic:* marcas_sonares
 * **Map**.  *Topic:* occupancy_marker
 * **Map**.  *Topic:* occupancy_marker_marcas
