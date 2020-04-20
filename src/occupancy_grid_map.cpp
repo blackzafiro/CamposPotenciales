@@ -9,9 +9,29 @@
 #include <nav_msgs/Odometry.h>
 #include <vector>
 #include <math.h>
+//#include <rviz/grid_display.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 // %EndTag(INCLUDES)%
+
+
+
+///
+/// Funciones auxiliares
+///
+
+/**
+ * Devuelve ángulo en el rango [-PI, PI]
+ * @param angulo
+ * @return ángulo normalizado
+ */
+double anguloEnRango(double angulo)
+{
+  angulo = remainder(angulo, 2.0 * M_PI);
+  if (angulo > M_PI) angulo -= 2.0 * M_PI;
+  return angulo;
+}
+
 
 
 ///
@@ -20,7 +40,7 @@
 
 class VelocidadKobuki {
 private:
-  double _linear;
+  double _linear;     // TODO: ¿Unidades?
   double _angular;
 
 public:
@@ -50,28 +70,22 @@ public:
   Loc2D(double x, double y, double angulo) : _x(x), _y(y), _angulo(angulo){}
   double x() { return _x; }
   double y() { return _y; }
-  double ang() { return _angulo; }
+  double angulo() { return _angulo; }
   void x(double x) { this->_x = x; }
   void y(double y) { this->_y = y; }
-  void ang(double angulo) { this->_angulo = angulo; }
+  void angulo(double angulo) { this->_angulo = angulo; }
+  Loc2D operator+(const Loc2D& l) const
+  {
+    Loc2D suma;
+    suma._x = this->_x + l._x;
+    suma._y = this->_y + l._y;
+    suma._angulo = anguloEnRango(this->_angulo + l._angulo);
+    return suma;
+  }
 };
 
 
-///
-/// Funciones auxiliares
-///
 
-/**
- * Devuelve ángulo en el rango [-PI, PI]
- * @param angulo
- * @return ángulo normalizado
- */
-double anguloEnRango(double angulo)
-{
-  angulo = remainder(angulo, 2.0 * M_PI);
-  if (angulo > M_PI) angulo -= 2.0 * M_PI;
-  return angulo;
-}
 
 /// El eje X es rojo.
 /// El eje Y es verde.
@@ -80,21 +94,31 @@ double anguloEnRango(double angulo)
 class Sonar
 {
 private:
-  double _angulo;  // Ángulo con respecto al frente del robot
+  //double _angulo;  // Ángulo con respecto al frente del robot
+  Loc2D _posicion;   // Posición del sonar con respecto al centro del robot.
 
 public:
   /** Constructores */
-  Sonar() : _angulo(0) {}
-  Sonar(double angulo) : _angulo(angulo) {}
-
-  double angulo() { return _angulo; }
+  Sonar() {}
+  /** Inicia la posición del sonar con respecto al centro del robot. */
+  Sonar(const Loc2D& cRobot)
+  {
+    _posicion = cRobot;
+  }
 
   /** Obtiene las coordenadas del sensor dado el centro del robot. */
-  Loc2D getPosicion(double xr, double yr)
+  Loc2D getPosicion(const Loc2D pRobot)
   {
+    return pRobot + _posicion;
+  }
 
+  /** Obtiene las coordenadas del sensor con respecto al centro del robot. */
+  Loc2D getPosicion()
+  {
+    return _posicion;
   }
 };
+
 
 class RobotInfo
 {
@@ -109,32 +133,6 @@ private:
   ros::Publisher marcas_sonar_pub;
   visualization_msgs::Marker sonar_line_list;
 
-  void llenaLineaSonares()
-  {
-    sonar_line_list.header.frame_id = "base_link";
-    sonar_line_list.header.stamp = ros::Time();
-    sonar_line_list.ns = "kobu_namespace";
-    sonar_line_list.action = visualization_msgs::Marker::ADD;
-    sonar_line_list.pose.orientation.w = 1.0;
-    sonar_line_list.id = 0;
-    sonar_line_list.type = visualization_msgs::Marker::LINE_LIST;
-    sonar_line_list.scale.x = 0.1;
-    sonar_line_list.color.b = 1.0;
-    sonar_line_list.color.a = 1.0;
-
-    for (int i = 0; i < NUM_SONARES; i++)
-    {
-      geometry_msgs::Point p;
-      p.x = _posicion.x();
-      p.y = _posicion.y();
-      p.z = 0.0;
-      sonar_line_list.points.push_back(p);
-      p.x += cos(sonares[i].angulo());
-      p.y += sin(sonares[i].angulo());
-      sonar_line_list.points.push_back(p);
-    }
-  }
-
 public:
   /** Inicializa la información del robot. */
   RobotInfo(ros::NodeHandle& r_n)
@@ -145,14 +143,6 @@ public:
     llenaLineaSonares();
   }
 
-  void iniciaSonares()
-  {
-    for(int i = 0; i < NUM_SONARES; i++)
-    {
-      sonares[i] = Sonar(2 * M_PI * i / NUM_SONARES);
-    }
-  }
-
   void extraePosicion(const nav_msgs::Odometry& odom)
   {
     _posicion.x(odom.pose.pose.position.x);
@@ -161,6 +151,23 @@ public:
     // TODO
     //tf2::Quaternion q;
     //_posicion.ang(odom.pose.pose.orientation);
+/*
+    for (int i = 0; i < NUM_SONARES; i++)
+    {
+      geometry_msgs::Point p;
+      p.x = _posicion.x();
+      p.y = _posicion.y();
+      p.z = 0.0;
+      sonar_line_list.points[2*i] = p;
+    }*/
+  }
+
+  /**
+   * Actualiza los valores de las distancias a obstáculos medidas por los sonares.
+   */
+  void tomaLecturaSonares()
+  {
+
   }
 
   VelocidadKobuki& velocidad() { return _velocidad; }
@@ -170,6 +177,51 @@ public:
   void publicaSonares()
   {
     marcas_sonar_pub.publish(sonar_line_list);
+  }
+
+private:
+  void iniciaSonares()
+  {
+    Loc2D pos;
+    for(int i = 0; i < NUM_SONARES; i++)
+    {
+      pos.angulo(2 * M_PI * i / NUM_SONARES);
+      pos.x(RADIO * cos(pos.angulo()));
+      pos.y(RADIO * sin(pos.angulo()));
+      sonares[i] = Sonar(pos);
+    }
+  }
+
+
+  void llenaLineaSonares()
+  {
+    sonar_line_list.header.frame_id = "base_link";
+    sonar_line_list.header.stamp = ros::Time();
+    sonar_line_list.ns = "kobu_namespace";
+    sonar_line_list.action = visualization_msgs::Marker::ADD;
+    sonar_line_list.pose.orientation.w = 1.0;
+    sonar_line_list.id = 1;
+    sonar_line_list.type = visualization_msgs::Marker::LINE_LIST;
+    sonar_line_list.scale.x = 0.02;
+    sonar_line_list.color.b = 1.0;
+    sonar_line_list.color.a = 1.0;
+
+    Loc2D pos;
+    for (int i = 0; i < NUM_SONARES; i++)
+    {
+      geometry_msgs::Point p;
+      // Posición del sonar en la kobuki
+      pos = sonares[i].getPosicion();
+      p.x = pos.x();
+      p.y = pos.y();
+      p.z = 0.0;
+      sonar_line_list.points.push_back(p);
+
+      // Final de la línea del sonar a un metro, por defecto.
+      p.x += cos(pos.angulo());
+      p.y += sin(pos.angulo());
+      sonar_line_list.points.push_back(p);
+    }
   }
 };
 
@@ -185,18 +237,22 @@ private:
   const int WIDTH = 24;          /// A lo largo del eje rojo x
   const int HEIGHT = 31;         /// A lo largo del eje verde
   const float RESOLUTION = 0.3f; /// [m/cell]
-  const int OCUPADA = 100;
+  const int OCUPADA = 100;       /// 100% de probabilidad
 
-  ros::Publisher marker_pub;
+  ros::Publisher marker_pub;     /// Publica todos los *marker*
+
+  // Flecha verde con la velocidad de la Kobuki
   visualization_msgs::Marker marca_velocidad;
+
+  // Indicadores cuando RViz recibe la orden de asignar una meta.
   bool _navegando;
-  ros::Publisher meta_pub;
   visualization_msgs::Marker marca_meta;
 
+  /// Mapa y marcadores de operaciones en el mapa.
   ros::Publisher grid_pub;
   ros::Publisher grid_pub_marcas;
-  nav_msgs::OccupancyGrid mapa;
-  nav_msgs::OccupancyGrid mapa_marcas;
+  nav_msgs::OccupancyGrid mapa;         // Mapa
+  nav_msgs::OccupancyGrid mapa_marcas;  // Para depurado y visualización
 
   ros::NodeHandle& r_n;
 
@@ -210,8 +266,7 @@ public:
   /** Constructor. */
   Mapa(ros::NodeHandle& r_n) : r_n(r_n), _colorPrevio(-1), _navegando(false), _robot_info(r_n)
   {
-    marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-    meta_pub = r_n.advertise<visualization_msgs::Marker>("marca_meta", 1);
+    marker_pub = r_n.advertise<visualization_msgs::Marker>("visualization_marker", 5);
     grid_pub = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker", 1);
     grid_pub_marcas = r_n.advertise<nav_msgs::OccupancyGrid>("occupancy_marker_marcas", 1);
     llenaVelocidad();
@@ -248,13 +303,14 @@ public:
     _celdaPrevia = coords;
     mapa_marcas.data[coords.i*WIDTH+coords.j] = 20;
 
-    _robot_info.extraePosicion(odom);
+    //_robot_info.extraePosicion(odom);
 
     marca_meta.points[0].x = odom.pose.pose.position.x; //_robot_info.posicion().x();
     marca_meta.points[0].y = odom.pose.pose.position.y; //_robot_info.posicion().y();
     if (_navegando)
     {
-      meta_pub.publish(marca_meta);
+      //meta_pub.publish(marca_meta);
+      marker_pub.publish(marca_meta);
     }
     _robot_info.publicaSonares();
   }
@@ -263,10 +319,16 @@ public:
   void receiveNavGoal(const geometry_msgs::PoseStamped& poseStamped)
   {
     _navegando = true;
+    // Posición del robot
+    marca_meta.points[0].x = _robot_info.posicion().x(),
+    marca_meta.points[0].y = _robot_info.posicion().y(),
+    marca_meta.points[0].z = 0,
+    // Posición de la meta
     marca_meta.points[1].x = poseStamped.pose.position.x;
     marca_meta.points[1].y = poseStamped.pose.position.y;
     marca_meta.points[1].z = poseStamped.pose.position.z;
-    meta_pub.publish(marca_meta);
+    //meta_pub.publish(marca_meta);
+    marker_pub.publish(marca_meta);
     ROS_INFO("\nFrame: %s\nMove to: [%f, %f, %f] - [%f, %f, %f, %f]\n(%f, %f, %f) -> (%f, %f, %f)",
              poseStamped.header.frame_id.c_str(),
              poseStamped.pose.position.x,
@@ -285,7 +347,7 @@ public:
            );
   }
 
-  void publicate()
+  void publiicate()
   {
     grid_pub.publish(mapa);
     grid_pub_marcas.publish(mapa_marcas);
@@ -321,7 +383,7 @@ private:
     marca_meta.header.frame_id = "odom";
     marca_meta.header.stamp = ros::Time();
     marca_meta.ns = "kobu_namespace";
-    marca_meta.id = 0;
+    marca_meta.id = 1;
     marca_meta.type = visualization_msgs::Marker::ARROW;
     marca_meta.action = visualization_msgs::Marker::ADD;
     marca_meta.pose.position.x = 0;
@@ -633,15 +695,15 @@ int main( int argc, char** argv )
   ros::NodeHandle n;
   ros::Rate r(1);
   Mapa mapa(n);
-  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 5, &Mapa::receiveNavGoal, &mapa); // Máximo 5 mensajes en la cola.
-  ros::Subscriber sub_vel = n.subscribe("/mobile_base/commands/velocity", 2, &Mapa::publicaVelocidad, &mapa); // Máximo 5 mensajes en la cola.
-  ros::Subscriber sub_odom = n.subscribe("/odom", 3, &Mapa::leePosicion, &mapa);
+  ros::Subscriber sub = n.subscribe("/move_base_simple/goal", 2, &Mapa::receiveNavGoal, &mapa); // Máximo 2 mensajes en la cola.
+  ros::Subscriber sub_vel = n.subscribe("/mobile_base/commands/velocity", 2, &Mapa::publicaVelocidad, &mapa); // Máximo 2 mensajes en la cola.
+  ros::Subscriber sub_odom = n.subscribe("/odom", 2, &Mapa::leePosicion, &mapa);
 // %EndTag(INIT)%
 
 
   while (ros::ok())
   {
-    mapa.publicate();
+    mapa.publiicate();
 
 // %Tag(SLEEP_END)%
     ros::spinOnce();
