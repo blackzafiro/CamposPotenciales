@@ -1,0 +1,11 @@
+<launch>
+	<!-- Lanza el simulador de la kobuki -->
+	<include file="$(find kobuki_softnode)/launch/full.launch" />
+
+	<!-- Corre el nodo con los campos potenciales -->
+	<node name="basic_fields" pkg="campos_potenciales" type="basic_fields"/>
+
+	<!-- Abre rviz, con la configuración para ver el robot y los marcadores de los campos -->
+	<arg name="rvizconfig" default="$(find campos_potenciales)/rviz/urdf.rviz" />
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
+</launch>
